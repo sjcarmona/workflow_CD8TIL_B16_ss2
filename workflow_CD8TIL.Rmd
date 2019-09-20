@@ -1,5 +1,6 @@
 ---
-title: "Analysis of sc-RNAseq data (smart-seq2) of CD8 TIL from B16 tumors of Singer et al Cell 2016"
+title: Analysis of sc-RNAseq data (smart-seq2) of CD8 TIL from B16 tumors of Singer
+  et al Cell 2016
 author: "Santiago J. Carmona"
 output: html_notebook
 ---
@@ -7,7 +8,7 @@ output: html_notebook
 This is a guided analysis to show how to interpret (CD8 T cell) single-cell RNA-seq data using Seurat and other R packages.
 We use a public dataset of small size (~1K cells) in order to make fast calculations
 
-```{r}
+```{r results=FALSE, message=FALSE}
 #install.packages("Seurat")
 library(Seurat)
 source("functions.R")
@@ -124,8 +125,8 @@ length(data.seurat@var.genes)
 ```
 
 
-```{r}
-data.seurat@hvg.info[order(data.seurat@hvg.info$gene.mean,decreasing = T),]
+```{r }
+head(row.names(data.seurat@hvg.info)[order(data.seurat@hvg.info$gene.mean,decreasing = T)],n=20)
 ```
 
 
@@ -224,7 +225,7 @@ Strong effect from cell cycle genes,
 we might want to remove them from our list of highly variable genes used for dimensionality
 
 Get list of cell cycle genes (map to Ensembl IDs)
-```{r}
+```{r results=FALSE, message=FALSE}
   #BiocManager::install("org.Mm.eg.db",type="source")
   #BiocManager::install("clusterProfiler")
   #BiocManager::install("DO.db",type="source")
@@ -393,15 +394,19 @@ classification of CD8 TIL states using TILPRED
 ```
 
 ```{r}
-#library(SingleCellExperiment)
-#library(AUCell)
+library(SingleCellExperiment)
+library(AUCell)
 library(TILPRED)
 data.sce <- Convert(data.seurat,to="sce")
 data.sce.pred <- predictTilState(data.sce)
 table(data.sce.pred$predictedState)
 ```
 ```{r}
-head(data.sce.pred)
+str(data.sce.pred)
+```
+
+```{r}
+head(data.sce.pred$stateProbabilityMatrix)
 ```
 
 
@@ -447,17 +452,17 @@ barplot(tapply(data.seurat@meta.data$cycling,data.seurat@meta.data$cluster,mean)
 ```
 
 ```{r}
-clusterColors <- c("#F8766D","#A58AFF","#00B6EB","#53B400","#000000")
+clusterColors <- c("#F8766D","#A58AFF","#00B6EB","#53B400","#FF00FF")
 names(clusterColors) <- c(5,1,4,2,3) 
 
 ```
 
 
 
-```{r}
+```{r results=F, message=F}
 #BiocManager::install("MAST")
 data.seurat <- SetAllIdent(object = data.seurat, id = "cluster")
-cd8.markers <- FindAllMarkers(object = data.seurat, only.pos = TRUE, min.pct = 0.1, min.diff.pct=0.1, logfc.threshold = 0.25, test.use = "MAST",max.cells.per.ident = Inf)
+cd8.markers <- FindAllMarkers(object = data.seurat, only.pos = TRUE, min.pct = 0.1, min.diff.pct=0.1, logfc.threshold = 0.25, test.use = "bimod",max.cells.per.ident = Inf)#Try MAST
 ```
 
 
@@ -469,7 +474,7 @@ lapply(cd8.markers.list,head)
 
 
 
-```{r eval=F}
+```{r }
 set.seed(1234)
 
 geneSample <- unique(unlist(lapply(cd8.markers.list,function(x) { head(x,n=10) })))
@@ -498,9 +503,10 @@ DotPlot(data.seurat,genes.plot = myMarkers,x.lab.rot = 1,plot.legend =T,cols.use
 
 ```{r}
 signatureList <- list()
-signatureList$gs_Cytotoxicity <- c("Prf1","Fasl","Gzmb")
-signatureList$gs_Stemness <- c("Tcf7","Sell","Il7r","Lef1")
-signatureList$gs_InhibitoryReceptors <- c("Pdcd1","Havcr2","Tigit","Lag3","Ctla4")
+signatureList$Cytotoxicity <- c("Prf1","Fasl","Gzmb")
+signatureList$Stemness <- c("Tcf7","Sell","Il7r","Lef1")
+signatureList$InhibitoryReceptors <- c("Pdcd1","Havcr2","Tigit","Lag3","Ctla4")
+signatureList$cellCycleGenes <- cellCycle.symbol
 ```
 
 
@@ -533,8 +539,8 @@ for (s in names(signatureList)) {
 ```
 
 
-```{r, fig.width=2}
-for (s in grep("gs_",names(signatureList), value=T)) {
+```{r}
+for (s in names(signatureList)) {
   print(VlnPlot(object = data.seurat, features.plot = paste0("AUC_",s), point.size.use=0.001, cols.use=clusterColors, group.by = "cluster"))
 }
 ```
