@@ -5,16 +5,25 @@ author: "Santiago J. Carmona"
 output: html_notebook
 ---
 
-This is a guided analysis to show how to interpret (CD8 T cell) single-cell RNA-seq data using Seurat and other R packages.
-We use a public dataset of small size (~1K cells) in order to make fast calculations
+This is a guided analysis to show how to interpret (CD8 T cell) single-cell RNA-seq data using *Seurat* and other **R packages**.
+We use a public dataset of small size (~1K cells) in order to make fast calculations [GEO GSE85947](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE85947)
 
+
+###  
+### Import data
+
+
+###  
+Load packages and source files (custom functions)
 ```{r results=FALSE, message=FALSE}
 #install.packages("Seurat")
 library(Seurat)
 source("functions.R")
 ```
 
-Read expression matrix (log2 (TPM+1 ))
+###  
+###  
+Read expression matrix ($log2 (TPM+1 )$)
 ```{r Import data}
 
 if(!file.exists("input/GSE86028_TILs_sc_wt_mtko.tpm.log2.txt.gz")){
@@ -25,7 +34,8 @@ m <- read.csv(gzfile("input/GSE86028_TILs_sc_wt_mtko.tpm.log2.txt.gz"),row.names
 m[1:10,1:5]
 ```
 
-
+###  
+###  
 Read meta data
 ```{r Import meta-data}
 
@@ -38,12 +48,19 @@ head(meta)
 str(meta)
 ```
 
+
+###  
+### QC and cell filtering
+###  
+###  
 Create Seurat object
 ```{r}
 data.seurat <- CreateSeuratObject(m, meta.data = meta, project = "tumorTILS", min.cells = 3,  min.genes = 500, is.expr = 0,do.scale=F, do.center=F)
 rm(m,meta)
 ```
 
+###  
+###  
 Explore samples
 ```{r}
 table(data.seurat@meta.data$mouse_id)
@@ -54,6 +71,8 @@ summary(data.seurat@meta.data$nGene)
 summary(data.seurat@meta.data$nUMI)
 ```
 
+###  
+###  
 Caclulate ribosomal content (might indicate techincal variability) (same for mitochondrial content)
 ```{r}
 ribo.genes <- grep(pattern = "^Rp[ls]", x = rownames(x = data.seurat@data), value = TRUE)
@@ -61,13 +80,16 @@ percent.ribo <- Matrix::colSums(data.seurat@raw.data[ribo.genes, ])/Matrix::colS
 summary(percent.ribo)
 ```
 
+###  
+###  
 Add new 'metadata' to our Seurat object
 ```{r}
 data.seurat <- AddMetaData(object = data.seurat, metadata = percent.ribo, col.name = "percent.ribo")
 print(paste("matrix dim",dim(data.seurat@data)))
 ```
 
-
+###  
+###  
 In this dataset 'high quality' cells were already selected, however we might want to filter further based on these parameters
 ```{r}
 hist(data.seurat@meta.data$nGene)
@@ -77,7 +99,9 @@ hist(data.seurat@meta.data$percent.ribo)
 Note that Seurat automatically calculates 'nUMI' per cell, assuming @data matrix contains UMI counts.
 In this case however, 'nUMI' contains the sum of the normalized expression values (log2 TPM) for each cell
 
-
+###  
+###  
+Look at distributions per sample
 ```{r}
 data.seurat <- SetAllIdent(object = data.seurat, id = "mouse_id")
 VlnPlot(object = data.seurat, features.plot = c("nGene", "nUMI","percent.ribo"), nCol = 2,point.size.use=0.001)
@@ -91,12 +115,15 @@ data.seurat <- FilterCells(object = data.seurat, subset.names = c("nGene", "nUMI
 print(paste("matrix dim",dim(data.seurat@data)))
 ```
 
-
+###  
+###  
 There are two groups of mice, Wildtype (WT) and MT KO
 ```{r}
 table(data.seurat@meta.data$condition_plate)
 ```
 
+###  
+###  
 Will analyze only cells from WT mice 
 ```{r}
 data.seurat <- SubsetData(data.seurat,cells.use = data.seurat@meta.data$condition_plate=="WT")
@@ -108,6 +135,10 @@ table(data.seurat@meta.data$mouse_id)
 
 
 
+###  
+### Dimensionality reduction
+###  
+###  
 Extract highly variable genes
 ```{r variableGenes}
 set.seed(1234)
@@ -129,20 +160,23 @@ length(data.seurat@var.genes)
 head(row.names(data.seurat@hvg.info)[order(data.seurat@hvg.info$gene.mean,decreasing = T)],n=20)
 ```
 
-
+###  
+###  
 Check expression values of a few genes
 ```{r fig.width=6, fig.asp=1}
 VlnPlot(data.seurat,features.plot = qq(Gapdh,Actg1,Actb,Ptprc,Cd2,Cd3g,Cd8a,Cd8b1), point.size.use = exp(-3), x.lab.rot=T)
 ```
 Some variation but no evident systematic biases 
 
-
-
+###  
+###  
+Looking at expression values
 ```{r}
 plot(density(as.numeric(data.seurat@data["Gzmb",])))
 ```
 
-
+###  
+###  
 Scale data (useful for example to do PCA on scaled variables, to make heatmaps, etc)
 ```{r}
 data.seurat <- ScaleData(
@@ -155,6 +189,8 @@ data.seurat <- ScaleData(
 plot(density(as.numeric(data.seurat@scale.data["Gzmb",])))
 ```
 
+###  
+###  
 PCA on highly variable genes
 ```{r}
 
@@ -168,13 +204,16 @@ We explore the genes with highers loading to have an idea of which ones are driv
 ```{r}
 PCElbowPlot(object = data.seurat)
 ```
-
+###  
+###  
 Check distribution per sample (batch effects?)
 ```{r}
 data.seurat <- SetAllIdent(object = data.seurat, id = "mouse_id")
 PCAPlot(object = data.seurat)
 ```
 
+###  
+###  
 
 Check distribution of important genes for our subset
 ```{r}
@@ -182,6 +221,8 @@ FeaturePlot(data.seurat,features.plot=c("Ptprc","Cd2","Cd8a","Cd8b1","Cd4"),redu
     "blue"),nCol=2,no.legend = F,do.return=T) 
 ```
 
+###  
+###  
 
 Cell cycle is typically a strong source of transcriptomic variation
 ```{r}
@@ -189,6 +230,8 @@ FeaturePlot(data.seurat,features.plot=c("Mki67","Ccna2","Cks1b"),reduction.use="
     "blue"),nCol=2,no.legend = F,do.return=T)
 ```
 
+###  
+###  
 
 Number of detected genes/reads count per cell associated to amount af mRNA: might be associated to biology (eg cell size, transcriptional activity), cell quality, technical effects, etc
 ```{r}
@@ -197,6 +240,8 @@ FeaturePlot(data.seurat,features.plot=c("nUMI","nGene","percent.ribo"),reduction
 ```
 There are some outliers. Not interested (unless looking for rare cell states)
 
+###  
+###  
 
 Spot genes among top genes contributing to PCs which might be associated to outliers
 ```{r}
@@ -205,6 +250,8 @@ FeaturePlot(data.seurat,features.plot=c("H2-Eb1","Ctsh","H2-Aa","H2-Ab1","Csf2rb
 ```
 Indeed, these outliers express high levels of MHC II genes, Csf2rb, etc. suggesting these might be contaminating myeloid/APCs
 
+###  
+###  
 
 Filter out outliers based on expression (or lack of) of a few genes (you might try multivariate filtering criteria as well)
 ```{r}
@@ -220,9 +267,11 @@ FeaturePlot(data.seurat,features.plot=c("Ptprc","Cd2","Cd8a","Cd8b1","H2-Aa","Cs
 ```
 Now it looks better
 
+###  
+###  
 
-Strong effect from cell cycle genes,
-we might want to remove them from our list of highly variable genes used for dimensionality
+Also there is a strong effect from cell cycle genes,
+we might want to remove them from our list of highly variable genes used for dimensionality  
 
 Get list of cell cycle genes (map to Ensembl IDs)
 ```{r results=FALSE, message=FALSE}
@@ -249,7 +298,12 @@ Get list of cell cycle genes (map to Ensembl IDs)
 ```
 
 
-#PCA
+###  
+### Dimensionality reduction and clustering
+
+###  
+###  
+PCA
 ```{r}
 data.seurat <- ScaleData(object = data.seurat, do.scale=T, do.center = T) #since we filtered out cells, scaling might have slightly changed
 set.seed(1234)
@@ -262,9 +316,10 @@ data.seurat <- RunPCA(object = data.seurat, pc.genes = data.seurat@var.genes, do
 PCElbowPlot(object = data.seurat)
 ```
 
-
+###  
+###  
 Clustering
-Good old hierarchical clustering?
+Good old hierarchical clustering
 ```{r}
 ndim <- 10
 
@@ -272,7 +327,9 @@ set.seed(1234)
 fit.hclust=hclust(dist(data.seurat@dr$pca@cell.embeddings[,1:ndim]),method="ward.D2")
 ```
 
-
+###  
+###  
+Checking silhouette using different number of clusters
 ```{r}
 library(cluster)
 sils=c()
@@ -291,11 +348,15 @@ data.seurat@ident <- clusters
 data.seurat <- StashIdent(object = data.seurat, save.name = "wardClustering")
 ```
 
+
 ```{r}
 data.seurat <- SetAllIdent(object = data.seurat, id = "wardClustering")
 PCAPlot(object = data.seurat)
 ```
 
+###  
+###  
+tSNE
 ```{r}
 data.seurat <- RunTSNE(object = data.seurat, dims.use = 1:ndim, do.fast = F, seed.use=123, perplexity=30)
 ```
@@ -303,6 +364,8 @@ data.seurat <- RunTSNE(object = data.seurat, dims.use = 1:ndim, do.fast = F, see
 ```{r}
 TSNEPlot(object = data.seurat, do.return = TRUE, no.legend = TRUE, do.label = TRUE, group.by = "wardClustering")
 ```
+###  
+###  
 
 Alternative clustering implemented in Seruat: shared nearest neighbor (SNN) modularity optimization based clustering algorithm
 ```{r}
@@ -323,7 +386,9 @@ data.seurat <- SetAllIdent(object = data.seurat, id = "res.0.5")
 data.seurat@meta.data$cluster <- data.seurat@meta.data$wardClustering
 ```
 Good correspondence
-
+###  
+###  
+K-Means
 ```{r}
 set.seed(1234)
 clusters.kmeans <- kmeans(data.seurat@dr$pca@cell.embeddings[,1:ndim],6,nstart = 10)
@@ -349,6 +414,8 @@ library(mclust)
   
   #ward clustering has more agreement with the other two
 ```
+###  
+###  
 
 Checking co-expression of important genes
 ```{r}
@@ -364,6 +431,8 @@ plot_grid(p1,p2,p3,p4)
 plot2geneSeuratTSNE(data.seurat,"Pdcd1","Tcf7")
 plot2geneSeuratTSNE(data.seurat,"Mki67","Ccna2")
 ```
+###  
+###  
 
 Sample distribution (biological variablity +batch effect)
 ```{r fig.width=2}
@@ -380,6 +449,8 @@ for (s in levels(factor(data.seurat@meta.data$mouse_id))) {
 
 
 
+###  
+### Supervised cell state identification
 classification of CD8 TIL states using TILPRED
 
 ```{r}
@@ -436,7 +507,9 @@ plot2 <- TSNEPlot(object = data.seurat, do.return = TRUE, no.legend = TRUE, do.l
 plot_grid(plot1, plot2)
 ```
 
-
+###  
+###  
+Explore association of clusters and predicted states
 ```{r }
 library(pheatmap)
 library(RColorBrewer)
@@ -446,11 +519,15 @@ a.scaled
 pheatmap(round(a.scaled),cexCol = 0.8,cluster_cols = F)
 ```
 
-
+###  
+###  
+Cycling cells per cluster
 ```{r}
 barplot(tapply(data.seurat@meta.data$cycling,data.seurat@meta.data$cluster,mean))
 ```
 
+###  
+###  
 ```{r}
 clusterColors <- c("#F8766D","#A58AFF","#00B6EB","#53B400","#FF00FF")
 names(clusterColors) <- c(5,1,4,2,3) 
@@ -459,6 +536,8 @@ names(clusterColors) <- c(5,1,4,2,3)
 
 
 
+###  
+### Differential gene expression and gene signature enrichment analysis
 ```{r results=F, message=F}
 #BiocManager::install("MAST")
 data.seurat <- SetAllIdent(object = data.seurat, id = "cluster")
@@ -500,7 +579,9 @@ DotPlot(data.seurat,genes.plot = myMarkers,x.lab.rot = 1,plot.legend =T,cols.use
 ```
 
 
-
+###  
+###  
+Define a few example gene signatures
 ```{r}
 signatureList <- list()
 signatureList$Cytotoxicity <- c("Prf1","Fasl","Gzmb")
@@ -510,6 +591,9 @@ signatureList$cellCycleGenes <- cellCycle.symbol
 ```
 
 
+###  
+###  
+Use AUCell package to calculate signature enrichment
 ```{r}
 #BiocManager::install("AUCell")
 library(AUCell)
