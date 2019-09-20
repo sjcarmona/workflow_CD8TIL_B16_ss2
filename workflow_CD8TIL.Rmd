@@ -1,0 +1,540 @@
+---
+title: "Analysis of sc-RNAseq data (smart-seq2) of CD8 TIL from B16 tumors of Singer et al Cell 2016"
+author: "Santiago J. Carmona"
+output: html_notebook
+---
+
+This is a guided analysis to show how to interpret (CD8 T cell) single-cell RNA-seq data using Seurat and other R packages.
+We use a public dataset of small size (~1K cells) in order to make fast calculations
+
+```{r}
+#install.packages("Seurat")
+library(Seurat)
+source("functions.R")
+```
+
+Read expression matrix (log2 (TPM+1 ))
+```{r Import data}
+
+if(!file.exists("input/GSE86028_TILs_sc_wt_mtko.tpm.log2.txt.gz")){
+download.file("https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE86028&format=file&file=GSE86028_TILs_sc_wt_mtko.tpm.log2.txt.gz",destfile = "input/GSE86028_TILs_sc_wt_mtko.tpm.log2.txt.gz")
+}
+
+m <- read.csv(gzfile("input/GSE86028_TILs_sc_wt_mtko.tpm.log2.txt.gz"),row.names=1,sep=" ",header=T)
+m[1:10,1:5]
+```
+
+
+Read meta data
+```{r Import meta-data}
+
+meta <- read.csv(gzfile("input/GSE86028_TILs_sc_wt_mtko.index.txt.gz"),sep="\t",as.is=F,row.names=1)
+meta$mouse_id = factor(meta$mouse_id)
+meta$plate_uniq_num = factor(meta$plate_uniq_num)
+meta$batch_bio = factor(meta$batch_bio)
+
+head(meta)
+str(meta)
+```
+
+Create Seurat object
+```{r}
+data.seurat <- CreateSeuratObject(m, meta.data = meta, project = "tumorTILS", min.cells = 3,  min.genes = 500, is.expr = 0,do.scale=F, do.center=F)
+rm(m,meta)
+```
+
+Explore samples
+```{r}
+table(data.seurat@meta.data$mouse_id)
+```
+
+```{r}
+summary(data.seurat@meta.data$nGene)
+summary(data.seurat@meta.data$nUMI)
+```
+
+Caclulate ribosomal content (might indicate techincal variability) (same for mitochondrial content)
+```{r}
+ribo.genes <- grep(pattern = "^Rp[ls]", x = rownames(x = data.seurat@data), value = TRUE)
+percent.ribo <- Matrix::colSums(data.seurat@raw.data[ribo.genes, ])/Matrix::colSums(data.seurat@raw.data)
+summary(percent.ribo)
+```
+
+Add new 'metadata' to our Seurat object
+```{r}
+data.seurat <- AddMetaData(object = data.seurat, metadata = percent.ribo, col.name = "percent.ribo")
+print(paste("matrix dim",dim(data.seurat@data)))
+```
+
+
+In this dataset 'high quality' cells were already selected, however we might want to filter further based on these parameters
+```{r}
+hist(data.seurat@meta.data$nGene)
+hist(data.seurat@meta.data$nUMI)
+hist(data.seurat@meta.data$percent.ribo)
+```
+Note that Seurat automatically calculates 'nUMI' per cell, assuming @data matrix contains UMI counts.
+In this case however, 'nUMI' contains the sum of the normalized expression values (log2 TPM) for each cell
+
+
+```{r}
+data.seurat <- SetAllIdent(object = data.seurat, id = "mouse_id")
+VlnPlot(object = data.seurat, features.plot = c("nGene", "nUMI","percent.ribo"), nCol = 2,point.size.use=0.001)
+```
+
+
+```{r}
+print(paste("matrix dim",dim(data.seurat@data)))
+data.seurat <- FilterCells(object = data.seurat, subset.names = c("nGene", "nUMI","percent.ribo"), 
+    low.thresholds = c(1500, 8000, -Inf), high.thresholds = c(6000, 30000,0.1))
+print(paste("matrix dim",dim(data.seurat@data)))
+```
+
+
+There are two groups of mice, Wildtype (WT) and MT KO
+```{r}
+table(data.seurat@meta.data$condition_plate)
+```
+
+Will analyze only cells from WT mice 
+```{r}
+data.seurat <- SubsetData(data.seurat,cells.use = data.seurat@meta.data$condition_plate=="WT")
+```
+
+```{r}
+table(data.seurat@meta.data$mouse_id)
+```
+
+
+
+Extract highly variable genes
+```{r variableGenes}
+set.seed(1234)
+ 
+data.seurat <- FindVariableGenes(
+    object = data.seurat,
+    mean.function = ExpMean, 
+    dispersion.function = LogVMR, 
+    x.low.cutoff = 1,
+    x.high.cutoff = 15, 
+    y.cutoff = 1
+)
+
+length(data.seurat@var.genes)
+```
+
+
+```{r}
+data.seurat@hvg.info[order(data.seurat@hvg.info$gene.mean,decreasing = T),]
+```
+
+
+Check expression values of a few genes
+```{r fig.width=6, fig.asp=1}
+VlnPlot(data.seurat,features.plot = qq(Gapdh,Actg1,Actb,Ptprc,Cd2,Cd3g,Cd8a,Cd8b1), point.size.use = exp(-3), x.lab.rot=T)
+```
+Some variation but no evident systematic biases 
+
+
+
+```{r}
+plot(density(as.numeric(data.seurat@data["Gzmb",])))
+```
+
+
+Scale data (useful for example to do PCA on scaled variables, to make heatmaps, etc)
+```{r}
+data.seurat <- ScaleData(
+    object = data.seurat, do.scale=T, do.center = T
+)
+```
+
+
+```{r}
+plot(density(as.numeric(data.seurat@scale.data["Gzmb",])))
+```
+
+PCA on highly variable genes
+```{r}
+
+set.seed(1234)
+data.seurat <- RunPCA(object = data.seurat, pc.genes = data.seurat@var.genes, do.print = TRUE, pcs.print = 1:5, 
+    genes.print = 10)
+```
+We explore the genes with highers loading to have an idea of which ones are driving global variation (e.g. important T cell genes as expected, such as Sell, Lag3, Gzmb, Prf1; cell cycle genes such as Ccnb2, Cks1b, etc )
+
+
+```{r}
+PCElbowPlot(object = data.seurat)
+```
+
+Check distribution per sample (batch effects?)
+```{r}
+data.seurat <- SetAllIdent(object = data.seurat, id = "mouse_id")
+PCAPlot(object = data.seurat)
+```
+
+
+Check distribution of important genes for our subset
+```{r}
+FeaturePlot(data.seurat,features.plot=c("Ptprc","Cd2","Cd8a","Cd8b1","Cd4"),reduction.use="pca",cols.use = c("lightgrey", 
+    "blue"),nCol=2,no.legend = F,do.return=T) 
+```
+
+
+Cell cycle is typically a strong source of transcriptomic variation
+```{r}
+FeaturePlot(data.seurat,features.plot=c("Mki67","Ccna2","Cks1b"),reduction.use="pca",cols.use = c("lightgrey", 
+    "blue"),nCol=2,no.legend = F,do.return=T)
+```
+
+
+Number of detected genes/reads count per cell associated to amount af mRNA: might be associated to biology (eg cell size, transcriptional activity), cell quality, technical effects, etc
+```{r}
+FeaturePlot(data.seurat,features.plot=c("nUMI","nGene","percent.ribo"),reduction.use="pca",cols.use = c("lightgrey", 
+    "blue"),nCol=2,no.legend = F,do.return=T) 
+```
+There are some outliers. Not interested (unless looking for rare cell states)
+
+
+Spot genes among top genes contributing to PCs which might be associated to outliers
+```{r}
+FeaturePlot(data.seurat,features.plot=c("H2-Eb1","Ctsh","H2-Aa","H2-Ab1","Csf2rb"),reduction.use="pca",cols.use = c("lightgrey", 
+    "blue"),nCol=2,no.legend = F,do.return=T) 
+```
+Indeed, these outliers express high levels of MHC II genes, Csf2rb, etc. suggesting these might be contaminating myeloid/APCs
+
+
+Filter out outliers based on expression (or lack of) of a few genes (you might try multivariate filtering criteria as well)
+```{r}
+data.seurat <- FilterCells(object = data.seurat, subset.names = c("Cd2", "Cd8a","Cd8b1","Cd4","Ctsh"), 
+    low.thresholds = c(1, 1, 1,-Inf,-Inf), high.thresholds = c(Inf,Inf,Inf,exp(-10),exp(-10)))
+print(paste("matrix dim",dim(data.seurat@data)))
+
+```
+
+```{r}
+FeaturePlot(data.seurat,features.plot=c("Ptprc","Cd2","Cd8a","Cd8b1","H2-Aa","Csf2rb"),reduction.use="pca",cols.use = c("lightgrey", 
+    "blue"),nCol=2,no.legend = F,do.return=T) 
+```
+Now it looks better
+
+
+Strong effect from cell cycle genes,
+we might want to remove them from our list of highly variable genes used for dimensionality
+
+Get list of cell cycle genes (map to Ensembl IDs)
+```{r}
+  #BiocManager::install("org.Mm.eg.db",type="source")
+  #BiocManager::install("clusterProfiler")
+  #BiocManager::install("DO.db",type="source")
+  #BiocManager::install("GO.db",type="source")
+  #signatureList <- readRDS("input/signatureList.rds")
+  library(org.Mm.eg.db)
+  library(clusterProfiler)
+  
+  idMap <- bitr( rownames(data.seurat@data) , fromType = "SYMBOL", toType = c("ENTREZID"), OrgDb = org.Mm.eg.db)
+  
+  cellCycle <- mget(c("GO:0007049"),org.Mm.egGO2ALLEGS)
+  cellCycle <- unique(unlist(cellCycle))
+  cellCycle.symbol <- unique(na.omit(idMap$SYMBOL[match(cellCycle,idMap$ENTREZID)]))
+```
+
+```{r}
+  length(cellCycle.symbol)
+  print(length(data.seurat@var.genes))
+  data.seurat@var.genes <- setdiff(data.seurat@var.genes,cellCycle.symbol)
+  print(length(data.seurat@var.genes))
+```
+
+
+#PCA
+```{r}
+data.seurat <- ScaleData(object = data.seurat, do.scale=T, do.center = T) #since we filtered out cells, scaling might have slightly changed
+set.seed(1234)
+data.seurat <- RunPCA(object = data.seurat, pc.genes = data.seurat@var.genes, do.print = TRUE, pcs.print = 1:5, 
+    genes.print = 10)
+```
+
+
+```{r}
+PCElbowPlot(object = data.seurat)
+```
+
+
+Clustering
+Good old hierarchical clustering?
+```{r}
+ndim <- 10
+
+set.seed(1234)
+fit.hclust=hclust(dist(data.seurat@dr$pca@cell.embeddings[,1:ndim]),method="ward.D2")
+```
+
+
+```{r}
+library(cluster)
+sils=c()
+for (cc in 2:10){
+  clusters.cc=cutree(fit.hclust,k=cc)
+  sil.c=summary(silhouette(x=as.numeric(clusters.cc),dist=dist(data.seurat@dr$pca@cell.embeddings[,1:ndim])))
+  sils=c(sils,sil.c$avg.width)
+}
+plot(c(2:10),sils)
+```
+
+```{r}
+nclus <- 5
+clusters=factor(cutree(fit.hclust,k=nclus))
+data.seurat@ident <- clusters
+data.seurat <- StashIdent(object = data.seurat, save.name = "wardClustering")
+```
+
+```{r}
+data.seurat <- SetAllIdent(object = data.seurat, id = "wardClustering")
+PCAPlot(object = data.seurat)
+```
+
+```{r}
+data.seurat <- RunTSNE(object = data.seurat, dims.use = 1:ndim, do.fast = F, seed.use=123, perplexity=30)
+```
+
+```{r}
+TSNEPlot(object = data.seurat, do.return = TRUE, no.legend = TRUE, do.label = TRUE, group.by = "wardClustering")
+```
+
+Alternative clustering implemented in Seruat: shared nearest neighbor (SNN) modularity optimization based clustering algorithm
+```{r}
+set.seed(12345)
+data.seurat <- FindClusters(object = data.seurat, reduction.type = "pca", dims.use = 1:ndim, 
+    resolution = 0.5, print.output = 0, save.SNN = TRUE, force.recalc = T, k.param = 10)
+```
+
+
+```{r}
+plot1 <- TSNEPlot(object = data.seurat, do.return = TRUE, no.legend = TRUE, do.label = TRUE, group.by = "res.0.5")
+plot2 <- TSNEPlot(object = data.seurat, do.return = TRUE, group.by = "wardClustering", 
+    no.legend = TRUE, do.label = TRUE)
+
+plot_grid(plot1, plot2)
+
+data.seurat <- SetAllIdent(object = data.seurat, id = "res.0.5")
+data.seurat@meta.data$cluster <- data.seurat@meta.data$wardClustering
+```
+Good correspondence
+
+```{r}
+set.seed(1234)
+clusters.kmeans <- kmeans(data.seurat@dr$pca@cell.embeddings[,1:ndim],6,nstart = 10)
+data.seurat@ident <- factor(clusters.kmeans$cluster)
+data.seurat <- StashIdent(object = data.seurat, save.name = "kmeansClustering")
+TSNEPlot(object = data.seurat, do.return = TRUE, group.by = "kmeansClustering", 
+    no.legend = TRUE, do.label = TRUE)
+#ggsave("out/tSNE.0.pdf",width = 3,height = 3)
+```
+Also with KMeans
+
+
+```{r eval=F}
+table(data.seurat@meta.data$wardClustering,data.seurat@meta.data$cluster)
+
+# Rand index for cluster agreement
+
+#install.packages("mclust")
+library(mclust)
+  adjustedRandIndex(data.seurat@meta.data$wardClustering, data.seurat@meta.data$cluster)
+  adjustedRandIndex(data.seurat@meta.data$kmeans, data.seurat@meta.data$cluster)
+  adjustedRandIndex(data.seurat@meta.data$kmeans, data.seurat@meta.data$wardClustering)
+  
+  #ward clustering has more agreement with the other two
+```
+
+Checking co-expression of important genes
+```{r}
+p1 <- plot2geneSeuratTSNE(data.seurat,"Pdcd1","Tcf7")
+p2 <- plot2geneSeuratTSNE(data.seurat,"Gzmb","Ccr7")
+p3 <- plot2geneSeuratTSNE(data.seurat,"Lag3","Sell")
+p4 <- plot2geneSeuratTSNE(data.seurat,"Havcr2","Entpd1")
+plot_grid(p1,p2,p3,p4)
+#ggsave("out/tSNE.markers.pdf",width = 10,height=8)
+```
+
+```{r}
+plot2geneSeuratTSNE(data.seurat,"Pdcd1","Tcf7")
+plot2geneSeuratTSNE(data.seurat,"Mki67","Ccna2")
+```
+
+Sample distribution (biological variablity +batch effect)
+```{r fig.width=2}
+for (s in levels(factor(data.seurat@meta.data$mouse_id))) {
+  mycol <- data.seurat@meta.data$mouse_id==s
+  
+  print(ggplot(data=data.frame(data.seurat@dr$tsne@cell.embeddings), aes(x=tSNE_1,y=tSNE_2, color="gray")) + 
+          geom_point(color="gray",alpha=0.5) + 
+          geom_point(data=data.frame(data.seurat@dr$tsne@cell.embeddings[mycol,]),alpha=0.7, color="blue")  + 
+          theme_bw() + theme(aspect.ratio = 1, legend.position="right") + xlab("TSNE 1") + ylab("TSNE 2") + ggtitle(s))
+}
+```
+
+
+
+
+classification of CD8 TIL states using TILPRED
+
+```{r}
+#install.packages("BiocManager")
+#install.packages("doParallel")
+#install.packages("doRNG")
+#BiocManager::install("GenomeInfoDbData",type="source")
+#BiocManager::install("AUCell")
+#BiocManager::install("SingleCellExperiment",type="source")
+#install.packages("remotes")
+#remotes::install_github("carmonalab/TILPRED")
+```
+
+```{r}
+#library(SingleCellExperiment)
+#library(AUCell)
+library(TILPRED)
+data.sce <- Convert(data.seurat,to="sce")
+data.sce.pred <- predictTilState(data.sce)
+table(data.sce.pred$predictedState)
+```
+```{r}
+head(data.sce.pred)
+```
+
+
+```{r}
+data.seurat <- AddMetaData(object = data.seurat, metadata = data.sce.pred$predictedState, col.name = "state.pred")
+data.seurat <- AddMetaData(object = data.seurat, metadata = data.sce.pred$cycling, col.name = "cycling")
+
+```
+
+
+```{r}
+stateColorsPred <- c("#F8766D","#A58AFF","#00B6EB","#53B400","#000000")
+names(stateColorsPred) <- qq(Naive,Effector,MemoryLike,Exhausted,NP) 
+TSNEPlot(object = data.seurat, do.return = TRUE, no.legend = TRUE, do.label = TRUE, group.by = "state.pred", colors.use =stateColorsPred)
+TSNEPlot(object = data.seurat, do.return = TRUE, no.legend = TRUE, do.label = TRUE, group.by = "cycling")
+
+```
+```{r}
+plot1 <- TSNEPlot(object = data.seurat, do.return = TRUE, no.legend = TRUE, do.label = TRUE, group.by = "state.pred", colors.use =stateColorsPred)
+plot2 <- TSNEPlot(object = data.seurat, do.return = TRUE, no.legend = TRUE, do.label = TRUE, group.by = "cycling")
+plot_grid(plot1, plot2)
+```
+
+```{r}
+plot1 <- TSNEPlot(object = data.seurat, do.return = TRUE, no.legend = TRUE, do.label = TRUE, group.by = "state.pred", colors.use =stateColorsPred)
+plot2 <- TSNEPlot(object = data.seurat, do.return = TRUE, no.legend = TRUE, do.label = TRUE, group.by = "cluster")
+plot_grid(plot1, plot2)
+```
+
+
+```{r }
+library(pheatmap)
+library(RColorBrewer)
+a <- table(data.seurat@meta.data$state.pred,data.seurat@meta.data$cluster)
+a.scaled <- scale(a,scale = colSums(a),center=F)*100
+a.scaled
+pheatmap(round(a.scaled),cexCol = 0.8,cluster_cols = F)
+```
+
+
+```{r}
+barplot(tapply(data.seurat@meta.data$cycling,data.seurat@meta.data$cluster,mean))
+```
+
+```{r}
+clusterColors <- c("#F8766D","#A58AFF","#00B6EB","#53B400","#000000")
+names(clusterColors) <- c(5,1,4,2,3) 
+
+```
+
+
+
+```{r}
+#BiocManager::install("MAST")
+data.seurat <- SetAllIdent(object = data.seurat, id = "cluster")
+cd8.markers <- FindAllMarkers(object = data.seurat, only.pos = TRUE, min.pct = 0.1, min.diff.pct=0.1, logfc.threshold = 0.25, test.use = "MAST",max.cells.per.ident = Inf)
+```
+
+
+```{r}
+cd8.markers.list <- split(cd8.markers,cd8.markers$cluster)
+cd8.markers.list <- lapply((cd8.markers.list),function(x) x$gene)
+lapply(cd8.markers.list,head)
+```
+
+
+
+```{r eval=F}
+set.seed(1234)
+
+geneSample <- unique(unlist(lapply(cd8.markers.list,function(x) { head(x,n=10) })))
+
+clusterList <- split(row.names(data.seurat@meta.data),data.seurat@meta.data$cluster)
+cellSample <- unlist(lapply(clusterList,function(x) { head(x,n=25) }))
+
+ann_col <- data.frame(cluster = data.seurat@meta.data$cluster)
+row.names(ann_col) <- row.names(data.seurat@meta.data)
+
+ann_colors <- list(cluster = clusterColors)
+
+pheatmap(data.seurat@data[geneSample,cellSample], cluster_rows = T, cluster_cols = F, labels_col = "",annotation_col = ann_col[cellSample,,drop=F],scale = "row", clustering_distance_rows="correlation", annotation_colors = ann_colors)
+```
+
+
+
+```{r, fig.width=5}
+myMarkers <- qq(Sell,Il7r,Lef1,S1pr1,Ccr7,Tcf7,Cd44,Ccl5,Gzmk,Cxcr3,Gzmb,Fasl,Prf1,Tox,Batf,Pdcd1,Lag3,Tigit,Havcr2,Entpd1,Mki67,Ccna2)
+data.seurat <- SetAllIdent(object = data.seurat, id = "cluster")
+DotPlot(data.seurat,genes.plot = myMarkers,x.lab.rot = 1,plot.legend =T,cols.use = "RdYlGn")
+#ggsave("out/DotPlot.pdf",width = 10, height = 3)
+```
+
+
+
+```{r}
+signatureList <- list()
+signatureList$gs_Cytotoxicity <- c("Prf1","Fasl","Gzmb")
+signatureList$gs_Stemness <- c("Tcf7","Sell","Il7r","Lef1")
+signatureList$gs_InhibitoryReceptors <- c("Pdcd1","Havcr2","Tigit","Lag3","Ctla4")
+```
+
+
+```{r}
+#BiocManager::install("AUCell")
+library(AUCell)
+set.seed(1234)
+cells_rankings <- AUCell::AUCell_buildRankings(as.matrix(data.seurat@data), nCores=2, plotStats=TRUE)
+```
+
+
+
+```{r}
+cells_AUC <- AUCell_calcAUC(signatureList, cells_rankings, aucMaxRank=1500)
+cells_AUC
+```
+
+
+```{r}
+data.seurat@meta.data <- data.seurat@meta.data[!grepl("^AUC",colnames(data.seurat@meta.data))]
+data.seurat <- AddMetaData(data.seurat, metadata = t(getAUC(cells_AUC)), col.name = paste0("AUC_",rownames(cells_AUC)))
+```
+
+```{r}
+for (s in names(signatureList)) {
+
+  print(myFeaturePlotAUC(data.seurat,s))
+
+}
+```
+
+
+```{r, fig.width=2}
+for (s in grep("gs_",names(signatureList), value=T)) {
+  print(VlnPlot(object = data.seurat, features.plot = paste0("AUC_",s), point.size.use=0.001, cols.use=clusterColors, group.by = "cluster"))
+}
+```
