@@ -125,7 +125,7 @@ length(data.seurat@var.genes)
 ```
 
 
-```{r }
+```{r eval=F }
 head(row.names(data.seurat@hvg.info)[order(data.seurat@hvg.info$gene.mean,decreasing = T)],n=20)
 ```
 
