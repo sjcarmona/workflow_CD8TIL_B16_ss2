@@ -75,6 +75,13 @@ Hash: f663cedf4d9d364f99c4ca615368ab5e
 Requires: AnnotationDbi, BiocParallel, DO.db, GOSemSim, S4Vectors,
     fgsea, ggplot2, qvalue, reshape2
 
+Package: DT
+Source: CRAN
+Version: 0.9
+Hash: f72fd6ee6cf1656384503d6c7ca6cd96
+Requires: crosstalk, htmltools, htmlwidgets, jsonlite, magrittr,
+    promises
+
 Package: DelayedArray
 Source: Bioconductor
 Version: 0.8.0
@@ -472,6 +479,13 @@ Source: CRAN
 Version: 1.4-0
 Hash: 5eef58a5bcfd315a326eeaf43720cd26
 
+Package: colourpicker
+Source: CRAN
+Version: 1.0
+Hash: eeabe1a468bdf15e9001a6cecbd56013
+Requires: ggplot2, htmltools, htmlwidgets, jsonlite, miniUI, shiny,
+    shinyjs
+
 Package: cowplot
 Source: CRAN
 Version: 0.9.4
@@ -837,7 +851,7 @@ Requires: htmltools, jsonlite, yaml
 Package: httpuv
 Source: CRAN
 Version: 1.4.5.1
-Hash: c1952824aa156a78fb421ea09b67473d
+Hash: d9e43248a4355da57d5e29260e962c95
 Requires: BH, Rcpp, later, promises
 
 Package: httr
@@ -845,6 +859,15 @@ Source: CRAN
 Version: 1.4.0
 Hash: 62d62d3ffcc9a34411b6e35a813f72dd
 Requires: R6, curl, jsonlite, mime, openssl
+
+Package: iSEE
+Source: Bioconductor
+Version: 1.2.4
+Hash: 04b2f20b5b1f6fee708d4a8ccc73b733
+Requires: AnnotationDbi, BiocGenerics, DT, S4Vectors,
+    SingleCellExperiment, SummarizedExperiment, colourpicker, cowplot,
+    dplyr, ggplot2, igraph, rentrez, reshape2, rintrojs, scales, shiny,
+    shinyAce, shinydashboard, shinyjs, vipor, viridisLite
 
 Package: ica
 Source: CRAN
@@ -860,7 +883,7 @@ Requires: Matrix, magrittr, pkgconfig
 Package: irlba
 Source: CRAN
 Version: 2.3.3
-Hash: b54c77f8a47a3d33dd738d5ae9d491bf
+Hash: 4c9aa63af2d809a341ad68e49b365594
 Requires: Matrix
 
 Package: iterators
@@ -980,6 +1003,12 @@ Package: mime
 Source: CRAN
 Version: 0.6
 Hash: 2ed8f98b8284ad733f3907fc6e2f1334
+
+Package: miniUI
+Source: CRAN
+Version: 0.1.1.1
+Hash: c7e3ea486421c2fa5b03bb7fcd0415f6
+Requires: htmltools, shiny
 
 Package: mixtools
 Source: CRAN
@@ -1106,7 +1135,7 @@ Requires: R6, crayon, hms, prettyunits
 Package: promises
 Source: CRAN
 Version: 1.0.1
-Hash: 9ecc9727826384f2b4e0c8cf11adfc58
+Hash: 9bd4f07515f0bb5e649fa9a91a387ec9
 Requires: R6, Rcpp, later, magrittr, rlang
 
 Package: proxy
@@ -1137,6 +1166,12 @@ Source: CRAN
 Version: 0.5
 Hash: 1004d1d9c234b4b1eb320917a6e48045
 
+Package: rentrez
+Source: CRAN
+Version: 1.2.2
+Hash: e290094b2d271f92b99302f2fdb8fa55
+Requires: XML, httr, jsonlite
+
 Package: reshape2
 Source: CRAN
 Version: 1.4.3
@@ -1154,6 +1189,12 @@ Source: Bioconductor
 Version: 2.26.2
 Hash: be620b78424f85d2fb8ee2bd22518f9d
 Requires: Rhdf5lib
+
+Package: rintrojs
+Source: CRAN
+Version: 0.2.2
+Hash: 1e4f694dc8559c14b5c927ce2a6e4e5f
+Requires: jsonlite, shiny
 
 Package: rlang
 Source: CRAN
@@ -1247,6 +1288,24 @@ Hash: 6853126283ff0572d9f370a1520ac831
 Requires: R6, crayon, digest, htmltools, httpuv, jsonlite, later, mime,
     promises, rlang, sourcetools, xtable
 
+Package: shinyAce
+Source: CRAN
+Version: 0.4.0
+Hash: c98761e41df5c9524811800042ace1fd
+Requires: jsonlite, shiny
+
+Package: shinydashboard
+Source: CRAN
+Version: 0.7.1
+Hash: 9ff3e3d1aa83d9ae9b75c6f31e982aa6
+Requires: htmltools, promises, shiny
+
+Package: shinyjs
+Source: CRAN
+Version: 1.0
+Hash: ea95f751025e50227a96100be35e970b
+Requires: digest, htmltools, jsonlite, shiny
+
 Package: slam
 Source: CRAN
 Version: 0.1-45
@@ -1333,8 +1392,8 @@ Requires: Rcpp, farver, magrittr, rlang
 
 Package: units
 Source: CRAN
-Version: 0.6-2
-Hash: 4f5eba8e3750df4f2e8b6236a1ace19d
+Version: 0.6-4
+Hash: 6f14ddc1ffe897f4c2e53c91df73bc19
 Requires: Rcpp
 
 Package: urltools
