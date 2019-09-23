@@ -431,7 +431,7 @@ TSNEPlot(object = data.seurat, do.return = TRUE, group.by = "kmeansClustering",
 Also with KMeans
 
 
-```{r eval=F}
+```{r eval=T, message=F}
 table(data.seurat@meta.data$wardClustering,data.seurat@meta.data$cluster)
 
 # Rand index for cluster agreement
@@ -442,8 +442,9 @@ library(mclust)
   adjustedRandIndex(data.seurat@meta.data$kmeans, data.seurat@meta.data$cluster)
   adjustedRandIndex(data.seurat@meta.data$kmeans, data.seurat@meta.data$wardClustering)
   
-  #SNN clustering has more agreement with the other two
 ```
+
+
 ###  
 ###  
 
