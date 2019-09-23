@@ -6,7 +6,7 @@ knit: (function(input_file, encoding) {
   rmarkdown::render(input_file,
  encoding=encoding,
  output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
-output: html_notebook
+#output: html_notebook
 ---
 
 This is a guided analysis to show how to interpret (CD8 T cell) single-cell RNA-seq data using [Seurat](https://github.com/satijalab/seurat), [TILPred](https://github.com/carmonalab/TILPRED), [AUCell](https://github.com/aertslab/AUCell) and other **R packages**
@@ -228,7 +228,7 @@ PCElbowPlot(object = data.seurat)
 Check distribution per sample (batch effects?)
 ```{r}
 data.seurat <- SetAllIdent(object = data.seurat, id = "mouse_id")
-PCAPlot(object = data.seurat)
+PCAPlot(object = data.seurat)  + theme(aspect.ratio = 1)
 ```
 
 ###  
@@ -236,8 +236,7 @@ PCAPlot(object = data.seurat)
 
 Check distribution of important genes for our subset
 ```{r}
-FeaturePlot(data.seurat,features.plot=c("Ptprc","Cd2","Cd8a","Cd8b1","Cd4"),reduction.use="pca",cols.use = c("lightgrey", 
-    "blue"),nCol=2,no.legend = F,do.return=T) 
+FeaturePlot(data.seurat,features.plot=c("Cd2","Cd8a","Cd8b1","Cd4"),reduction.use="pca",cols.use = c("lightgrey","blue"),nCol=2,no.legend = F) 
 ```
 
 ###  
@@ -246,7 +245,7 @@ FeaturePlot(data.seurat,features.plot=c("Ptprc","Cd2","Cd8a","Cd8b1","Cd4"),redu
 Cell cycle is typically a strong source of transcriptomic variation
 ```{r}
 FeaturePlot(data.seurat,features.plot=c("Mki67","Ccna2","Cks1b"),reduction.use="pca",cols.use = c("lightgrey", 
-    "blue"),nCol=2,no.legend = F,do.return=T)
+    "blue"),nCol=2,no.legend = F,do.return=F)
 ```
 
 ###  
@@ -254,8 +253,7 @@ FeaturePlot(data.seurat,features.plot=c("Mki67","Ccna2","Cks1b"),reduction.use="
 
 Number of detected genes/reads count per cell associated to amount af mRNA: might be associated to biology (eg cell size, transcriptional activity), cell quality, technical effects, etc
 ```{r}
-FeaturePlot(data.seurat,features.plot=c("nUMI","nGene","percent.ribo"),reduction.use="pca",cols.use = c("lightgrey", 
-    "blue"),nCol=2,no.legend = F,do.return=T) 
+FeaturePlot(data.seurat,features.plot=c("nUMI","nGene","percent.ribo"),reduction.use="pca",cols.use = c("lightgrey","blue"),nCol=2,no.legend = F,do.return=F) 
 ```
 There are some outliers. Not interested (unless looking for rare cell states)
 
@@ -264,8 +262,7 @@ There are some outliers. Not interested (unless looking for rare cell states)
 
 Spot genes among top genes contributing to PCs which might be associated to outliers
 ```{r}
-FeaturePlot(data.seurat,features.plot=c("H2-Eb1","Ctsh","H2-Aa","H2-Ab1","Csf2rb"),reduction.use="pca",cols.use = c("lightgrey", 
-    "blue"),nCol=2,no.legend = F,do.return=T) 
+FeaturePlot(data.seurat,features.plot=c("Ctsh","H2-Aa","H2-Ab1","Csf2rb"),reduction.use="pca",cols.use = c("lightgrey", "blue"),nCol=2,no.legend = F,do.return=F) 
 ```
 Indeed, these outliers express high levels of MHC II genes, Csf2rb, etc. suggesting these might be contaminating myeloid/APCs
 
@@ -281,7 +278,7 @@ print(paste("matrix dim",dim(data.seurat@data)))
 ```
 
 ```{r}
-FeaturePlot(data.seurat,features.plot=c("Ptprc","Cd2","Cd8a","Cd8b1","H2-Aa","Csf2rb"),reduction.use="pca",cols.use = c("lightgrey", 
+FeaturePlot(data.seurat,features.plot=c("Cd8a","Cd8b1","H2-Aa","Csf2rb"),reduction.use="pca",cols.use = c("lightgrey", 
     "blue"),nCol=2,no.legend = F,do.return=T) 
 ```
 
@@ -350,7 +347,7 @@ data.seurat <- RunTSNE(object = data.seurat, dims.use = 1:ndim, do.fast = F, see
 
 ```{r}
 #pdf("out/tsne_Markers.pdf",width=10,height=10)
-myMarkers <- qq(Sell,Il7r,Ccr7,Tcf7,Gzmb,Fasl,Prf1,Pdcd1,Lag3,Tigit,Havcr2,Entpd1,Mki67,Ccna2)
+myMarkers <- qq(Sell,Ccr7,Gzmb,Pdcd1,Havcr2,Ccna2)
 FeaturePlot(data.seurat,features.plot=myMarkers,reduction.use="tsne",cols.use = c("lightgrey", "blue"),nCol=3,no.legend = F,do.return=T) 
 #dev.off()
 ```
@@ -444,24 +441,6 @@ library(mclust)
   
 ```
 
-
-###  
-###  
-
-Checking co-expression of important genes
-```{r}
-p1 <- plot2geneSeuratTSNE(data.seurat,"Pdcd1","Tcf7")
-p2 <- plot2geneSeuratTSNE(data.seurat,"Gzmb","Ccr7")
-p3 <- plot2geneSeuratTSNE(data.seurat,"Lag3","Sell")
-p4 <- plot2geneSeuratTSNE(data.seurat,"Havcr2","Entpd1")
-plot_grid(p1,p2,p3,p4)
-#ggsave("out/tSNE.markers.pdf",width = 10,height=8)
-```
-
-```{r}
-plot2geneSeuratTSNE(data.seurat,"Pdcd1","Tcf7")
-plot2geneSeuratTSNE(data.seurat,"Mki67","Ccna2")
-```
 ###  
 ###  
 
