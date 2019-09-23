@@ -6,7 +6,7 @@ knit: (function(input_file, encoding) {
   rmarkdown::render(input_file,
  encoding=encoding,
  output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
-output: html_notebook
+#output: html_notebook
 ---
 
 This is a guided analysis to show how to interpret (CD8 T cell) single-cell RNA-seq data using [Seurat](https://github.com/satijalab/seurat), [TILPred](https://github.com/carmonalab/TILPRED), [AUCell](https://github.com/aertslab/AUCell) and other **R packages**
@@ -648,7 +648,7 @@ for (s in names(signatureList)) {
 }
 ```
 
-```{r}
+```{r eval=F}
 #BiocManager::install("iSEE")
 library(iSEE)
 app <- iSEE(data.sce)
