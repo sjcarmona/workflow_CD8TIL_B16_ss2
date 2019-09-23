@@ -6,11 +6,25 @@ knit: (function(input_file, encoding) {
   rmarkdown::render(input_file,
  encoding=encoding,
  output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
+output: html_notebook
 ---
 
 This is a guided analysis to show how to interpret (CD8 T cell) single-cell RNA-seq data using [Seurat](https://github.com/satijalab/seurat), [TILPred](https://github.com/carmonalab/TILPRED), [AUCell](https://github.com/aertslab/AUCell) and other **R packages**
 We use a public dataset of small size (~1K cells) in order to make fast calculations from Singer et al 2016 [GEO GSE85947](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE85947)
 
+
+
+###  
+### Preparing the environment
+
+###  
+Install required packages using packrat
+```{r eval=F, results=FALSE, message=FALSE}
+install.packages("Packrat")
+library(packrat)
+packrat::on()
+packrat::restore()
+```
 
 
 
@@ -632,6 +646,13 @@ for (s in names(signatureList)) {
 for (s in names(signatureList)) {
   print(VlnPlot(object = data.seurat, features.plot = paste0("AUC_",s), point.size.use=0.001, cols.use=clusterColors, group.by = "cluster"))
 }
+```
+
+```{r}
+#BiocManager::install("iSEE")
+library(iSEE)
+app <- iSEE(data.sce)
+shiny::runApp(app)
 ```
 
 
