@@ -6,7 +6,7 @@ knit: (function(input_file, encoding) {
   rmarkdown::render(input_file,
  encoding=encoding,
  output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
-#output: html_notebook
+output: html_notebook
 ---
 
 This is a guided analysis to show how to interpret (CD8 T cell) single-cell RNA-seq data using [Seurat](https://github.com/satijalab/seurat), [TILPred](https://github.com/carmonalab/TILPRED), [AUCell](https://github.com/aertslab/AUCell) and other **R packages**
@@ -295,11 +295,11 @@ we might want to remove them from our list of highly variable genes used for dim
 
 Get list of cell cycle genes (map to Ensembl IDs)
 ```{r results=FALSE, message=FALSE}
+if(!file.exists("aux/cellCycle.symbol.csv")){
   #BiocManager::install("org.Mm.eg.db",type="source")
   #BiocManager::install("clusterProfiler")
   #BiocManager::install("DO.db",type="source")
   #BiocManager::install("GO.db",type="source")
-  #signatureList <- readRDS("input/signatureList.rds")
   library(org.Mm.eg.db)
   library(clusterProfiler)
   
@@ -308,6 +308,11 @@ Get list of cell cycle genes (map to Ensembl IDs)
   cellCycle <- mget(c("GO:0007049"),org.Mm.egGO2ALLEGS)
   cellCycle <- unique(unlist(cellCycle))
   cellCycle.symbol <- unique(na.omit(idMap$SYMBOL[match(cellCycle,idMap$ENTREZID)]))
+  write.csv(cellCycle.symbol,file = "aux/cellCycle.symbol.csv")
+} else {
+  cellCycle.symbol <- read.csv("aux/cellCycle.symbol.csv",as.is=T)$x
+}
+  
 ```
 
 ```{r}
