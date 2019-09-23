@@ -1,7 +1,6 @@
 ---
-title: Analysis of sc-RNAseq data (smart-seq2) of CD8 TIL from B16 tumors of Singer
-  et al Cell 2016
-author: "Santiago J. Carmona"
+title: Tutorial analysis of sc-RNAseq data (smart-seq2) of CD8 TIL from B16 tumors
+author: "Santiago J. Carmona <santiago.carmona at unil.ch>"
 knit: (function(input_file, encoding) {
   out_dir <- 'docs';
   rmarkdown::render(input_file,
@@ -9,8 +8,10 @@ knit: (function(input_file, encoding) {
  output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
 ---
 
-This is a guided analysis to show how to interpret (CD8 T cell) single-cell RNA-seq data using *Seurat* and other **R packages**.
-We use a public dataset of small size (~1K cells) in order to make fast calculations [GEO GSE85947](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE85947)
+This is a guided analysis to show how to interpret (CD8 T cell) single-cell RNA-seq data using [Seurat](https://github.com/satijalab/seurat), [TILPred](https://github.com/carmonalab/TILPRED), [AUCell](https://github.com/aertslab/AUCell) and other **R packages**
+We use a public dataset of small size (~1K cells) in order to make fast calculations from Singer et al 2016 [GEO GSE85947](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE85947)
+
+
 
 
 ###  
@@ -269,7 +270,8 @@ print(paste("matrix dim",dim(data.seurat@data)))
 FeaturePlot(data.seurat,features.plot=c("Ptprc","Cd2","Cd8a","Cd8b1","H2-Aa","Csf2rb"),reduction.use="pca",cols.use = c("lightgrey", 
     "blue"),nCol=2,no.legend = F,do.return=T) 
 ```
-Now it looks better
+
+Outliers were removed
 
 ###  
 ###  
