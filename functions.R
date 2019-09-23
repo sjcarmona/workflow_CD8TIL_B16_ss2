@@ -35,14 +35,13 @@ myFeaturePlot = function(x,m){
   
 }
 
-myFeaturePlotAUC = function(x,m){
+myFeaturePlotAUC = function(x,m,cells_AUC){
   
-  ggplot(data.frame(x@dr$tsne@cell.embeddings), aes(x=tSNE_1,y=tSNE_2, color=getAUC(cells_AUC)[m,])) + geom_point( alpha=0.6, size=1)  + scale_colour_gradient(low="gray",high="blue") + theme(aspect.ratio = 1) + theme_bw()  +  guides(color=guide_legend(title=m)) + theme(aspect.ratio = 1, legend.position="bottom") + xlab("tSNE 1") + ylab("tSNE 2")
+  ggplot(data.frame(x@dr$tsne@cell.embeddings), aes(x=tSNE_1,y=tSNE_2, color=assays(cells_AUC)$AUC[m,])) + geom_point( alpha=0.6, size=1)  + scale_colour_gradient(low="gray",high="blue") + theme(aspect.ratio = 1) + theme_bw()  +  guides(color=guide_legend(title=m)) + theme(aspect.ratio = 1, legend.position="bottom") + xlab("tSNE 1") + ylab("tSNE 2")
   
 }
 
 
-#Define colors as in Figure 1A
 gg_color_hue <- function(n,alpha=1) {
   hues = seq(15, 375, length = n + 1)
   hcl(h = hues, l = 65, c = 100)[1:n]

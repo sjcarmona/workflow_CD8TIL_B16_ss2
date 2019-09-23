@@ -2,7 +2,11 @@
 title: Analysis of sc-RNAseq data (smart-seq2) of CD8 TIL from B16 tumors of Singer
   et al Cell 2016
 author: "Santiago J. Carmona"
-output: html_notebook
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
 ---
 
 This is a guided analysis to show how to interpret (CD8 T cell) single-cell RNA-seq data using *Seurat* and other **R packages**.
@@ -314,35 +318,58 @@ data.seurat <- RunPCA(object = data.seurat, pc.genes = data.seurat@var.genes, do
 
 ```{r}
 PCElbowPlot(object = data.seurat)
+ndim=10
 ```
 
-###  
-###  
-Clustering
-Good old hierarchical clustering
-```{r}
-ndim <- 10
 
+tSNE
+```{r}
+data.seurat <- RunTSNE(object = data.seurat, dims.use = 1:ndim, do.fast = F, seed.use=123, perplexity=30)
+```
+
+```{r}
+#pdf("out/tsne_Markers.pdf",width=10,height=10)
+myMarkers <- qq(Sell,Il7r,Ccr7,Tcf7,Gzmb,Fasl,Prf1,Pdcd1,Lag3,Tigit,Havcr2,Entpd1,Mki67,Ccna2)
+FeaturePlot(data.seurat,features.plot=myMarkers,reduction.use="tsne",cols.use = c("lightgrey", "blue"),nCol=3,no.legend = F,do.return=T) 
+#dev.off()
+```
+Visually explore heterogenity of relevant genes
+
+
+Clustering algorithm implemented in Seruat: shared nearest neighbor (SNN) modularity optimization based clustering algorithm. 
+Important parameters: *resolution*, *dims.use*, *k.param*
+```{r}
+set.seed(12345)
+data.seurat <- FindClusters(object = data.seurat, reduction.type = "pca", dims.use = 1:ndim, 
+    resolution = 0.5, print.output = 0, save.SNN = TRUE, force.recalc = T, k.param = 10)
+
+data.seurat@meta.data$cluster <- factor(data.seurat@meta.data$res.0.5)
+```
+
+
+###  
+###  
+Define cluster colors  
+```{r}
+clusterColors <- gg_color_hue(length(levels(data.seurat@meta.data$cluster)))
+names(clusterColors) <- levels(data.seurat@meta.data$cluster)
+
+```
+
+
+```{r}
+TSNEPlot(object = data.seurat, do.return = TRUE, no.legend = TRUE, do.label = TRUE, group.by = "cluster", colors.use = clusterColors)
+```
+
+
+###  
+###  
+Hierarchical clustering (might want to try dynamicTreeCut as well)
+```{r}
 set.seed(1234)
 fit.hclust=hclust(dist(data.seurat@dr$pca@cell.embeddings[,1:ndim]),method="ward.D2")
-```
 
-###  
-###  
-Checking silhouette using different number of clusters
-```{r}
-library(cluster)
-sils=c()
-for (cc in 2:10){
-  clusters.cc=cutree(fit.hclust,k=cc)
-  sil.c=summary(silhouette(x=as.numeric(clusters.cc),dist=dist(data.seurat@dr$pca@cell.embeddings[,1:ndim])))
-  sils=c(sils,sil.c$avg.width)
-}
-plot(c(2:10),sils)
-```
-
-```{r}
-nclus <- 5
+nclus <- 6
 clusters=factor(cutree(fit.hclust,k=nclus))
 data.seurat@ident <- clusters
 data.seurat <- StashIdent(object = data.seurat, save.name = "wardClustering")
@@ -351,39 +378,18 @@ data.seurat <- StashIdent(object = data.seurat, save.name = "wardClustering")
 
 ```{r}
 data.seurat <- SetAllIdent(object = data.seurat, id = "wardClustering")
-PCAPlot(object = data.seurat)
-```
-
-###  
-###  
-tSNE
-```{r}
-data.seurat <- RunTSNE(object = data.seurat, dims.use = 1:ndim, do.fast = F, seed.use=123, perplexity=30)
-```
-
-```{r}
 TSNEPlot(object = data.seurat, do.return = TRUE, no.legend = TRUE, do.label = TRUE, group.by = "wardClustering")
 ```
+
 ###  
 ###  
-
-Alternative clustering implemented in Seruat: shared nearest neighbor (SNN) modularity optimization based clustering algorithm
 ```{r}
-set.seed(12345)
-data.seurat <- FindClusters(object = data.seurat, reduction.type = "pca", dims.use = 1:ndim, 
-    resolution = 0.5, print.output = 0, save.SNN = TRUE, force.recalc = T, k.param = 10)
-```
-
-
-```{r}
-plot1 <- TSNEPlot(object = data.seurat, do.return = TRUE, no.legend = TRUE, do.label = TRUE, group.by = "res.0.5")
+plot1 <- TSNEPlot(object = data.seurat, do.return = TRUE, no.legend = TRUE, do.label = TRUE, group.by = "cluster")
 plot2 <- TSNEPlot(object = data.seurat, do.return = TRUE, group.by = "wardClustering", 
     no.legend = TRUE, do.label = TRUE)
 
 plot_grid(plot1, plot2)
 
-data.seurat <- SetAllIdent(object = data.seurat, id = "res.0.5")
-data.seurat@meta.data$cluster <- data.seurat@meta.data$wardClustering
 ```
 Good correspondence
 ###  
@@ -391,7 +397,8 @@ Good correspondence
 K-Means
 ```{r}
 set.seed(1234)
-clusters.kmeans <- kmeans(data.seurat@dr$pca@cell.embeddings[,1:ndim],6,nstart = 10)
+nclus=6
+clusters.kmeans <- kmeans(data.seurat@dr$pca@cell.embeddings[,1:ndim],nclus,nstart = 10)
 data.seurat@ident <- factor(clusters.kmeans$cluster)
 data.seurat <- StashIdent(object = data.seurat, save.name = "kmeansClustering")
 TSNEPlot(object = data.seurat, do.return = TRUE, group.by = "kmeansClustering", 
@@ -412,7 +419,7 @@ library(mclust)
   adjustedRandIndex(data.seurat@meta.data$kmeans, data.seurat@meta.data$cluster)
   adjustedRandIndex(data.seurat@meta.data$kmeans, data.seurat@meta.data$wardClustering)
   
-  #ward clustering has more agreement with the other two
+  #SNN clustering has more agreement with the other two
 ```
 ###  
 ###  
@@ -464,14 +471,18 @@ classification of CD8 TIL states using TILPRED
 #remotes::install_github("carmonalab/TILPRED")
 ```
 
-```{r}
+```{r results=FALSE, message=FALSE}
 library(SingleCellExperiment)
 library(AUCell)
 library(TILPRED)
+```
+
+```{r}
 data.sce <- Convert(data.seurat,to="sce")
 data.sce.pred <- predictTilState(data.sce)
 table(data.sce.pred$predictedState)
 ```
+
 ```{r}
 str(data.sce.pred)
 ```
@@ -526,13 +537,6 @@ Cycling cells per cluster
 barplot(tapply(data.seurat@meta.data$cycling,data.seurat@meta.data$cluster,mean))
 ```
 
-###  
-###  
-```{r}
-clusterColors <- c("#F8766D","#A58AFF","#00B6EB","#53B400","#FF00FF")
-names(clusterColors) <- c(5,1,4,2,3) 
-
-```
 
 
 
@@ -559,6 +563,7 @@ set.seed(1234)
 geneSample <- unique(unlist(lapply(cd8.markers.list,function(x) { head(x,n=10) })))
 
 clusterList <- split(row.names(data.seurat@meta.data),data.seurat@meta.data$cluster)
+
 cellSample <- unlist(lapply(clusterList,function(x) { head(x,n=25) }))
 
 ann_col <- data.frame(cluster = data.seurat@meta.data$cluster)
@@ -605,19 +610,15 @@ cells_rankings <- AUCell::AUCell_buildRankings(as.matrix(data.seurat@data), nCor
 
 ```{r}
 cells_AUC <- AUCell_calcAUC(signatureList, cells_rankings, aucMaxRank=1500)
-cells_AUC
-```
-
-
-```{r}
+print(cells_AUC)
 data.seurat@meta.data <- data.seurat@meta.data[!grepl("^AUC",colnames(data.seurat@meta.data))]
-data.seurat <- AddMetaData(data.seurat, metadata = t(getAUC(cells_AUC)), col.name = paste0("AUC_",rownames(cells_AUC)))
+data.seurat <- AddMetaData(data.seurat, metadata = t(assays(cells_AUC)$AUC), col.name = paste0("AUC_",rownames(cells_AUC)))
 ```
 
 ```{r}
 for (s in names(signatureList)) {
 
-  print(myFeaturePlotAUC(data.seurat,s))
+  print(myFeaturePlotAUC(data.seurat,s,cells_AUC))
 
 }
 ```
@@ -628,3 +629,9 @@ for (s in names(signatureList)) {
   print(VlnPlot(object = data.seurat, features.plot = paste0("AUC_",s), point.size.use=0.001, cols.use=clusterColors, group.by = "cluster"))
 }
 ```
+
+
+```{r}
+sessionInfo()
+```
+
