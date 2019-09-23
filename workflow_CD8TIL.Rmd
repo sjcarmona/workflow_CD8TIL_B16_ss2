@@ -391,7 +391,9 @@ plot2 <- TSNEPlot(object = data.seurat, do.return = TRUE, group.by = "wardCluste
 plot_grid(plot1, plot2)
 
 ```
-Good correspondence
+
+Good correspondence  
+
 ###  
 ###  
 K-Means
